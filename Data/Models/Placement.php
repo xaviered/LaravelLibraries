@@ -2,6 +2,8 @@
 
 namespace ixavier\LaravelLibraries\Data\Models;
 
+use \Illuminate\Database\Eloquent\Relations;
+
 /**
  * Class MetaDefinition holds meta definition for a given model
  */
@@ -10,15 +12,11 @@ class Placement extends Model
     /** @var string Table name */
     protected $table = 'placements';
 
-    public function alias() {
-        $this->belongsTo(Model::class, 'alias_id');
-    }
-
     /**
      * Related models
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return Relations\BelongsTo
      */
-    public function models()
+    public function models(): Relations\BelongsTo
     {
         return $this->belongsTo(
             Model::class,
@@ -27,9 +25,10 @@ class Placement extends Model
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo|Model|null
+     * @return Relations\BelongsTo|Model
      */
-    public function parent() {
+    public function parent(): Relations\BelongsTo
+    {
         return $this->belongsTo(Model::class, 'parent_id');
     }
 }

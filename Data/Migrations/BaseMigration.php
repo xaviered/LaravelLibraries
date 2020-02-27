@@ -11,7 +11,7 @@ use ixavier\LaravelLibraries\Data\Models\Placement;
 use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
 use ixavier\LaravelLibraries\Data\Models\Model;
 
-abstract class BaseMigration extends Migration
+class BaseMigration extends Migration
 {
     /** @var array Models for this migration */
     protected $models = [];
@@ -19,6 +19,9 @@ abstract class BaseMigration extends Migration
     /** @var Collection Names of the tables that will be created */
     protected $tables;
 
+    /**
+     * BaseMigration constructor.
+     */
     public function __construct()
     {
         $this->loadTableNames();
@@ -50,6 +53,7 @@ abstract class BaseMigration extends Migration
             $table->softDeletes();
             $table->string('title');
             $table->string('type');
+            $table->bigInteger('alias_id');
             $table->bigInteger('deleted_by');
             $table->bigInteger('updated_by');
             $table->text('content');
@@ -95,6 +99,7 @@ abstract class BaseMigration extends Migration
         foreach ($this->tables as $table) {
             Schema::dropIfExists($table->get('metaValue'));
             Schema::dropIfExists($table->get('metaDefinition'));
+            Schema::dropIfExists($table->get('placement'));
             Schema::dropIfExists($table->get('model'));
         }
     }

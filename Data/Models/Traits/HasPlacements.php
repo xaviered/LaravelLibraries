@@ -16,7 +16,7 @@ trait HasPlacements
 {
     /**
      * Related placements
-     * @return Relations\HasOne
+     * @return Relations\HasOne|Model
      */
     public function placement(): Relations\HasOne
     {
@@ -41,7 +41,7 @@ trait HasPlacements
     }
 
     /**
-     * @return Relations\BelongsTo
+     * @return Relations\BelongsTo|Model
      */
     public function original(): Relations\BelongsTo
     {
