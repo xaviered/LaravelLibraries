@@ -116,7 +116,6 @@ abstract class BaseMigration extends Migration
 //    -- sites placements
 //    insert into placements(id, objectid, parentid, children) values(1, 1, 0, "[2, 3, 4]");
 //
-//
 //    -- sports placements
 //    insert into placements(id, objectid, parentid, children) values(2, 2, 1, "[5]");
 //    insert into placements(id, objectid, parentid, children) values(3, 3, 1, null);

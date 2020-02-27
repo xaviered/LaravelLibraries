@@ -12,6 +12,15 @@ class Model extends BaseModel
     use HasMeta;
     use HasPlacements;
 
+    /** @var int When fetching children of a model and it is an alias, will fetch original model children too */
+    public const CHILDREN_FROM_CURRENT_AND_ORIGINAL_MODEL = 1;
+
+    /** @var int Fetch only children under the given model */
+    public const CHILDREN_FROM_CURRENT_MODEL = 2;
+
+    /** @var int Fetch only children under the original model if current model is an alias */
+    public const CHILDREN_FROM_ORIGINAL_MODEL = 3;
+
     /** @var string Table name */
     protected $table = 'models';
 

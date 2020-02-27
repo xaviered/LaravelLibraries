@@ -10,6 +10,10 @@ class Placement extends Model
     /** @var string Table name */
     protected $table = 'placements';
 
+    public function alias() {
+        $this->belongsTo(Model::class, 'alias_id');
+    }
+
     /**
      * Related models
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -20,5 +24,12 @@ class Placement extends Model
             Model::class,
             'model_id'
         );
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo|Model|null
+     */
+    public function parent() {
+        return $this->belongsTo(Model::class, 'parent_id');
     }
 }
