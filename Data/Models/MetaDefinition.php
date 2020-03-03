@@ -11,7 +11,7 @@ use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
 class MetaDefinition extends Model
 {
     /** @var string Table name */
-    protected $table = 'meta_definition';
+    protected $table = 'meta_definitions';
 
 //    /**
 //     * All related models to

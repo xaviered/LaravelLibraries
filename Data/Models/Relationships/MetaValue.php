@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class MetaValue extends Pivot
 {
     /** @var string Table name */
-    protected $table = 'meta_definitions';
+    protected $table = 'meta_values';
 
     /** @var bool Indicates if the IDs are auto-incrementing */
     public $incrementing = true;

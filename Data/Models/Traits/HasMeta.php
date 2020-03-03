@@ -19,9 +19,6 @@ trait HasMeta
     /** @var Collection Of meta values as [$metaName => MetaValue] */
     protected $metaValueObjects;
 
-    /** @var array All of the relationships to be touched */
-    protected $touches = ['metaDefinitions', 'metaValues'];
-
     /**
      * All meta definitions for this model
      * @return Relations\HasMany
@@ -142,6 +139,8 @@ trait HasMeta
      * @param string $metaName Meta name
      * @param MetaValue|mixed $value Value as MetaValue or a scalar
      * @return void
+     * @throws \TypeError If $value is not a MetaValue or a scalar
+     * @throws \InvalidArgumentException Meta definition not found.
      */
     public function setMetaValue(string $metaName, $value): void
     {
@@ -150,7 +149,7 @@ trait HasMeta
             if ($value instanceof MetaValue) {
                 $value = $value->value;
             } else if (!is_scalar($value)) {
-                throw new \InvalidArgumentException("Value needs to be a MetaValue or a scalar");
+                throw new \TypeError("Value needs to be a MetaValue or a scalar");
             }
 
             $mv = $this->getMetaValue($metaName) ?? new MetaValue();

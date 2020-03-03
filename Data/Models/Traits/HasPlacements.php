@@ -11,14 +11,18 @@ use ixavier\LaravelLibraries\Data\Models\Placement;
 
 /**
  * Trait HasPlacements contains all placement functionality
+ *
+ * @property Model $original If this is an alias, this is the original model
+ * @property Model $parent Parent of this model
+ * @property Placement $placement Placement obj
  */
 trait HasPlacements
 {
     /**
      * Related placements
-     * @return Relations\HasOne|Model
+     * @return Relations\HasOne|Placement
      */
-    public function placement(): Relations\HasOne
+    public function placement()
     {
         return $this->hasOne(
             Placement::class,
@@ -43,7 +47,7 @@ trait HasPlacements
     /**
      * @return Relations\BelongsTo|Model
      */
-    public function original(): Relations\BelongsTo
+    public function original(): ?Model
     {
         return $this->belongsTo(Model::class, 'alias_id');
     }
@@ -71,21 +75,7 @@ trait HasPlacements
     public function parent(): ?Model
     {
         /** @var Placement $placement */
-        $placement = $this->placement()
-            ->whereNull('alias_id')
-            ->whereNotNull('parent_id')
-            ->first();
-        if ($placement) {
-            $parent = $placement->parent()->first();
-            if ($parent) {
-                return $parent;
-            }
-
-            // @todo: Log here, this is a bug, the placements should have been logged as well
-            Log::log('warning', "Need to cleanup placements for model {$this->id}");
-        }
-
-        return null;
+        return $this->placement->parent();
     }
 
     /**

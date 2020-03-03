@@ -4,20 +4,19 @@ namespace ixavier\LaravelLibraries\Data\Migrations;
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Query;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use ixavier\LaravelLibraries\Data\Models\MetaDefinition;
 use ixavier\LaravelLibraries\Data\Models\Placement;
 use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
 use ixavier\LaravelLibraries\Data\Models\Model;
 
-class BaseMigration extends Migration
+class InitMigration extends Migration
 {
-    /** @var array Models for this migration */
-    protected $models = [];
-
     /** @var Collection Names of the tables that will be created */
-    protected $tables;
+    private $tables;
 
     /**
      * BaseMigration constructor.
@@ -28,9 +27,9 @@ class BaseMigration extends Migration
     }
 
     /**
-     * BaseMigration constructor.
+     * Loads table info for db
      */
-    public function loadTableNames()
+    private function loadTableNames(): void
     {
         $this->tables = new Collection([
             'model' => (new Model())->getTable(),
@@ -41,6 +40,49 @@ class BaseMigration extends Migration
     }
 
     /**
+     * Helper function to get table db builder
+     *
+     * @param string $tableName Table name from $this->tables
+     * @return Query\Builder
+     */
+    private function db(string $tableName): Query\Builder
+    {
+        return DB::table($this->tables->get($tableName));
+    }
+
+    /**
+     * @return Query\Builder Helper method to get model table
+     */
+    public function modelTable(): Query\Builder
+    {
+        return $this->db('model');
+    }
+
+    /**
+     * @return Query\Builder Helper method to get metaDefinition table
+     */
+    public function metaDefinitionTable(): Query\Builder
+    {
+        return $this->db('metaDefinition');
+    }
+
+    /**
+     * @return Query\Builder Helper method to get metaValue table
+     */
+    public function metaValueTable(): Query\Builder
+    {
+        return $this->db('metaValue');
+    }
+
+    /**
+     * @return Query\Builder Helper method to get metaValue table
+     */
+    public function placementTable(): Query\Builder
+    {
+        return $this->db('placement');
+    }
+
+    /**
      * Run the migrations.
      *
      * @return void
@@ -48,44 +90,57 @@ class BaseMigration extends Migration
     public function up()
     {
         Schema::create($this->tables->get('model'), function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->bigIncrements('id')->primary()->unique();
             $table->timestamps();
             $table->softDeletes();
             $table->string('title');
-            $table->string('type');
-            $table->bigInteger('alias_id');
-            $table->bigInteger('deleted_by');
-            $table->bigInteger('updated_by');
-            $table->text('content');
+            $table->string('type')->index();
+            $table->string('href')->nullable();
+            $table->bigInteger('alias_id', false, true)
+                ->nullable()
+                ->index();
+            $table->bigInteger('updated_by', false, true)
+                ->nullable()
+                ->index();
+            $table->bigInteger('created_by', false, true)
+                ->nullable()
+                ->index();
+            $table->text('content')->nullable();
         });
 
+        // @todo: This will be on a yaml file. global and on a per project basis
         Schema::create($this->tables->get('metaDefinition'), function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->bigIncrements('id')->primary()->unique();
             $table->timestamps();
             $table->softDeletes();
             $table->string('title');
-            $table->string('name');
             $table->string('type'); // for multi values, this will be `json`
-            $table->string('description');
-            $table->bigInteger('model_id');
+            $table->string('description')->nullable();
         });
 
+        // @todo: All meta will be store on this table, see if we can store in different tables
+        // change all code to get from this table
         Schema::create($this->tables->get('metaValue'), function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->bigIncrements('id')->primary()->unique();
             $table->timestamps();
 //            $table->softDeletes();
-            $table->bigInteger('model_id');
-            $table->bigInteger('meta_definition_id');
+            $table->string('title');
+            $table->string('name')->index();
+            $table->string('type'); // for multi values, this will be `json`
+            $table->string('description')->nullable();
             $table->text('value');
+            $table->bigInteger('model_id', false, true)->index();
+            $table->bigInteger('meta_definition_id', false, true)->index();
+            $table->unique(['model_id', 'meta_definition_id', 'name']);
         });
 
         Schema::create($this->tables->get('placement'), function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->bigIncrements('id')->primary()->unique();
             $table->timestamps();
             $table->softDeletes();
-            $table->bigInteger('model_id');
-            $table->bigInteger('parent_id');
-            $table->json('children');
+            $table->bigInteger('model_id', false, true);
+            $table->bigInteger('parent_id', false, true)->nullable();
+            $table->json('children')->nullable();
         });
     }
 
@@ -96,12 +151,10 @@ class BaseMigration extends Migration
      */
     public function down()
     {
-        foreach ($this->tables as $table) {
-            Schema::dropIfExists($table->get('metaValue'));
-            Schema::dropIfExists($table->get('metaDefinition'));
-            Schema::dropIfExists($table->get('placement'));
-            Schema::dropIfExists($table->get('model'));
-        }
+        Schema::dropIfExists($this->tables->get('metaValue'));
+        Schema::dropIfExists($this->tables->get('metaDefinition'));
+        Schema::dropIfExists($this->tables->get('placement'));
+        Schema::dropIfExists($this->tables->get('model'));
     }
 
 //    create table objects(id integer, title varchar(100), objecttype varchar(100));
