@@ -2,16 +2,35 @@
 
 namespace ixavier\LaravelLibraries\Data\Models;
 
-use \Illuminate\Database\Eloquent\Relations;
-use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Class MetaDefinition holds meta definition for a given model
+ *
+ * @property int $id ID of this meta definition
+ * @property string $deleted_at Date when this meta was deleted
+ * @property string $title Title of meta
+ * @property string $name Slug for this meta (must be unique across model types)
+ * @property string $type Data type
+ * @property string $description Description of this meta
+ * @property int $model_type Model type this meta definition belongs to
+ *
  */
-class MetaDefinition extends Model
+class MetaDefinition extends DataEntry
 {
+    use SoftDeletes;
+
     /** @var string Table name */
     protected $table = 'meta_definitions';
+
+    /** @var array The attributes that are mass assignable. */
+    protected $fillable = [
+        'title',
+        'name',
+        'type',
+        'description',
+        'model_type',
+    ];
 
 //    /**
 //     * All related models to

@@ -1,6 +1,6 @@
 <?php
 
-namespace ixavier\LaravelLibraries\Data\Migrations;
+namespace ixavier\LaravelLibraries\Data\DataStore;
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use ixavier\LaravelLibraries\Data\Models\MetaDefinition;
 use ixavier\LaravelLibraries\Data\Models\Placement;
-use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
+use ixavier\LaravelLibraries\Data\Models\MetaValue;
 use ixavier\LaravelLibraries\Data\Models\Model;
 
 class InitMigration extends Migration
@@ -33,8 +33,8 @@ class InitMigration extends Migration
     {
         $this->tables = new Collection([
             'model' => (new Model())->getTable(),
-            'metaDefinition' => (new MetaDefinition())->getTable(),
-            'metaValue' => (new MetaValue())->getTable(),
+            'meta_definition' => (new MetaDefinition())->getTable(),
+            'meta_value' => (new MetaValue())->getTable(),
             'placement' => (new Placement())->getTable(),
         ]);
     }
@@ -63,7 +63,7 @@ class InitMigration extends Migration
      */
     public function metaDefinitionTable(): Query\Builder
     {
-        return $this->db('metaDefinition');
+        return $this->db('meta_definition');
     }
 
     /**
@@ -71,7 +71,7 @@ class InitMigration extends Migration
      */
     public function metaValueTable(): Query\Builder
     {
-        return $this->db('metaValue');
+        return $this->db('meta_value');
     }
 
     /**
@@ -90,56 +90,53 @@ class InitMigration extends Migration
     public function up()
     {
         Schema::create($this->tables->get('model'), function (Blueprint $table) {
-            $table->bigIncrements('id')->primary()->unique();
+            $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->softDeletes();
             $table->string('title');
             $table->string('type')->index();
             $table->string('href')->nullable();
-            $table->bigInteger('alias_id', false, true)
+            $table->unsignedBigInteger('alias_id', false, true)
                 ->nullable()
                 ->index();
-            $table->bigInteger('updated_by', false, true)
+            $table->unsignedBigInteger('updated_by', false, true)
                 ->nullable()
                 ->index();
-            $table->bigInteger('created_by', false, true)
+            $table->unsignedBigInteger('created_by', false, true)
                 ->nullable()
                 ->index();
             $table->text('content')->nullable();
         });
 
-        // @todo: This will be on a yaml file. global and on a per project basis
-        Schema::create($this->tables->get('metaDefinition'), function (Blueprint $table) {
-            $table->bigIncrements('id')->primary()->unique();
+        // @todo: This will be on a config file. global and on a per project basis
+        Schema::create($this->tables->get('meta_definition'), function (Blueprint $table) {
+            $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->softDeletes();
             $table->string('title');
+            $table->string('name')->index(); // for multi values, this will be `json`
             $table->string('type'); // for multi values, this will be `json`
             $table->string('description')->nullable();
+            $table->string('model_type'); // for multi values, this will be `json`
+            $table->unique(['name', 'model_type']);
         });
 
         // @todo: All meta will be store on this table, see if we can store in different tables
         // change all code to get from this table
-        Schema::create($this->tables->get('metaValue'), function (Blueprint $table) {
-            $table->bigIncrements('id')->primary()->unique();
+        Schema::create($this->tables->get('meta_value'), function (Blueprint $table) {
+            $table->bigIncrements('id')->unique();
             $table->timestamps();
-//            $table->softDeletes();
-            $table->string('title');
-            $table->string('name')->index();
-            $table->string('type'); // for multi values, this will be `json`
-            $table->string('description')->nullable();
             $table->text('value');
-            $table->bigInteger('model_id', false, true)->index();
-            $table->bigInteger('meta_definition_id', false, true)->index();
-            $table->unique(['model_id', 'meta_definition_id', 'name']);
+            $table->unsignedBigInteger('model_id', false, true)->index();
+            $table->unsignedBigInteger('meta_definition_id', false, true)->index();
+            $table->unique(['model_id', 'meta_definition_id']);
         });
 
         Schema::create($this->tables->get('placement'), function (Blueprint $table) {
-            $table->bigIncrements('id')->primary()->unique();
+            $table->bigIncrements('id')->unique();
             $table->timestamps();
-            $table->softDeletes();
-            $table->bigInteger('model_id', false, true);
-            $table->bigInteger('parent_id', false, true)->nullable();
+            $table->unsignedBigInteger('model_id', false, true);
+            $table->unsignedBigInteger('parent_id', false, true)->nullable();
             $table->json('children')->nullable();
         });
     }
@@ -151,8 +148,8 @@ class InitMigration extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists($this->tables->get('metaValue'));
-        Schema::dropIfExists($this->tables->get('metaDefinition'));
+        Schema::dropIfExists($this->tables->get('meta_value'));
+        Schema::dropIfExists($this->tables->get('meta_definition'));
         Schema::dropIfExists($this->tables->get('placement'));
         Schema::dropIfExists($this->tables->get('model'));
     }

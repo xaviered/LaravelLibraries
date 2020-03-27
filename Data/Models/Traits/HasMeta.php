@@ -6,7 +6,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations;
 use ixavier\LaravelLibraries\Data\Models\MetaDefinition;
 use ixavier\LaravelLibraries\Data\Models\Model;
-use ixavier\LaravelLibraries\Data\Models\Relationships\MetaValue;
+use ixavier\LaravelLibraries\Data\Models\MetaValue;
 
 /**
  * Trait contains functionality to handle meta values for models
@@ -19,6 +19,17 @@ trait HasMeta
     /** @var Collection Of meta values as [$metaName => MetaValue] */
     protected $metaValueObjects;
 
+
+    /**
+     * @throws \LogicException When model is not saved and doesn't have type attribute set
+     */
+    private function validateIsSaved(): void
+    {
+        if (!$this->isSaved()) {
+            throw new \LogicException("Model needs to be saved on db and have a type attribute defined.");
+        }
+    }
+
     /**
      * All meta definitions for this model
      * @return Relations\HasMany
@@ -26,7 +37,7 @@ trait HasMeta
     protected function metaDefinitions(): Relations\HasMany
     {
         /** @var Model $this Model */
-        return $this->hasMany(MetaDefinition::class, 'model_id', 'id');
+        return $this->hasMany(MetaDefinition::class, 'model_type', 'type');
     }
 
     /**
@@ -62,6 +73,8 @@ trait HasMeta
      */
     public function setMetaDefinition(MetaDefinition $metaDefinition): void
     {
+        $this->validateIsSaved();
+
         $metaName = $metaDefinition->name;
 
         $attributes = $metaDefinition->attributesToArray();
@@ -71,7 +84,7 @@ trait HasMeta
         $md = $this->getMetaDefinition($metaName) ?? new MetaDefinition();
         $md->setRawAttributes($attributes);
 
-        $md->model_id = $this->id;
+        $md->model_type = $this->type;
         $md->save();
         $this->getMetaDefinitionObjects()->put($metaName, $md);
     }
@@ -101,7 +114,6 @@ trait HasMeta
             // @todo: May want to add in who columns
             ->as('entry')
             ->using(MetaValue::class)
-            ->withTimestamps()
             ->withPivot([
                 'value'
             ]);
@@ -144,11 +156,11 @@ trait HasMeta
      */
     public function setMetaValue(string $metaName, $value): void
     {
+        $this->validateIsSaved();
+
         $md = $this->getMetaDefinition($metaName);
         if ($md) {
-            if ($value instanceof MetaValue) {
-                $value = $value->value;
-            } else if (!is_scalar($value)) {
+            if (!($value instanceof MetaValue) || !is_scalar($value)) {
                 throw new \TypeError("Value needs to be a MetaValue or a scalar");
             }
 

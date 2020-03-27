@@ -8,7 +8,8 @@
     "php": "^7.2",
     "fideloper/proxy": "^4.0",
     "laravel/framework": "^6.2",
-    "laravel/tinker": "^2.0"
+    "laravel/tinker": "^2.0",
+    "symfony/dotenv": "^5.0"
   },
   "autoload": {
     "psr-4": {

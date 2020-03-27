@@ -2,6 +2,7 @@
 
 namespace ixavier\LaravelLibraries\Data\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasMeta;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasPlacements;
 use ixavier\LaravelLibraries\Http\Resources\BaseResource;
@@ -27,6 +28,15 @@ class Model extends DataEntry
 {
     use HasMeta;
     use HasPlacements;
+    use SoftDeletes;
+
+    // @todo: Add a check to allow to be null only if user is root
+    /** @var string Column name for created timestamp */
+    const CREATED_AT = 'created_at';
+
+    // @todo: Add a check to allow to be null only if user is root
+    /** @var string Column name for updated timestamp */
+    const UPDATED_AT = 'updated_at';
 
     /** @var int When fetching children of a model and it is an alias, will fetch original model children too */
     public const CHILDREN_FROM_CURRENT_AND_ORIGINAL_MODEL = 1;
@@ -86,7 +96,7 @@ class Model extends DataEntry
         }
 
         $model = new Model;
-        $model->setAttributes($values);
+        $model->setAttributes($values, $ignoreNonExistingMeta);
         if ($model->save()) {
             $model->placement()->create([
                 'model_id' => $model->id,
@@ -103,6 +113,14 @@ class Model extends DataEntry
         }
 
         return $model;
+    }
+
+    /**
+     * @return bool If attributes are saved on db
+     */
+    public function isSaved()
+    {
+        return !empty($this->id) && !empty($this->type);
     }
 
     /**
