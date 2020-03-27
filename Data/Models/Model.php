@@ -104,7 +104,10 @@ class Model extends DataEntry
             ]);
 
             if ($parent) {
-                $parent->placement->children[] = $this->id;
+                $c = $parent->placement->getAttribute('children');
+                $c[] = $model->id;
+                $parent->placement->setAttribute('children', $c);
+                $parent->placement->save();
                 // dynamically inject object so we don't have to reload from db
                 $parent->children()->add($this);
             }

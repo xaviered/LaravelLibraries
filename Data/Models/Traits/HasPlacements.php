@@ -133,10 +133,10 @@ trait HasPlacements
         $mtable = $this->getTable();
         $ptable = (new Placement())->getTable();
         return Model::query()
-            ->select("{$mtable}.*, $ptable.children as children")
+            ->select(["{$mtable}.*", "{$ptable}.children as children"])
             ->join($ptable, function (Query\JoinClause $join) use ($ptable, $mtable, $modelId) {
-                $join->on("{$ptable}.model_id", '=', $modelId)
-                    ->whereJsonContains("{$ptable}.children", "CAST({$mtable}.id as JSON)");
+                $join->whereJsonContains("{$ptable}.children", "CAST({$mtable}.id as JSON)")
+                    ->where("{$ptable}.model_id", '=', $modelId);
             })
             ->orderBy("children")
             ->get();

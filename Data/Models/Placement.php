@@ -17,6 +17,15 @@ class Placement extends DataEntry
     /** @var string Table name */
     protected $table = 'placements';
 
+    /**
+     * The attributes that should be cast to native types.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'children' => 'array',
+    ];
+
     /** @var array The attributes that are mass assignable. */
     protected $fillable = [
         'model_id',
@@ -45,25 +54,5 @@ class Placement extends DataEntry
             return $this->belongsTo(Model::class, 'parent_id');
         }
         return null;
-    }
-
-    /**
-     * Mutator to get JSON into array
-     * @param string $value JSON value
-     * @return array
-     */
-    public function getChildrenAttribute(string $value): array
-    {
-        return json_decode($value, JSON_OBJECT_AS_ARRAY) ?? [];
-    }
-
-    /**
-     * Mutator to get array to JSON
-     * @param array $value Array value
-     * @return string
-     */
-    public function setChildrenAttribute(array $value): string
-    {
-        return json_encode($value);
     }
 }
