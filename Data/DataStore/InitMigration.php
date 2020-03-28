@@ -4,9 +4,7 @@ namespace ixavier\LaravelLibraries\Data\DataStore;
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Database\Query;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use ixavier\LaravelLibraries\Data\Models\MetaDefinition;
 use ixavier\LaravelLibraries\Data\Models\Placement;
@@ -16,7 +14,7 @@ use ixavier\LaravelLibraries\Data\Models\Model;
 class InitMigration extends Migration
 {
     /** @var Collection Names of the tables that will be created */
-    private $tables;
+    private $db_entries;
 
     /**
      * BaseMigration constructor.
@@ -31,55 +29,12 @@ class InitMigration extends Migration
      */
     private function loadTableNames(): void
     {
-        $this->tables = new Collection([
-            'model' => (new Model())->getTable(),
-            'meta_definition' => (new MetaDefinition())->getTable(),
-            'meta_value' => (new MetaValue())->getTable(),
-            'placement' => (new Placement())->getTable(),
+        $this->db_entries = new Collection([
+            'model' => (new Model()),
+            'meta_definition' => (new MetaDefinition()),
+            'meta_value' => (new MetaValue()),
+            'placement' => (new Placement()),
         ]);
-    }
-
-    /**
-     * Helper function to get table db builder
-     *
-     * @param string $tableName Table name from $this->tables
-     * @return Query\Builder
-     */
-    private function db(string $tableName): Query\Builder
-    {
-        return DB::table($this->tables->get($tableName));
-    }
-
-    /**
-     * @return Query\Builder Helper method to get model table
-     */
-    public function modelTable(): Query\Builder
-    {
-        return $this->db('model');
-    }
-
-    /**
-     * @return Query\Builder Helper method to get metaDefinition table
-     */
-    public function metaDefinitionTable(): Query\Builder
-    {
-        return $this->db('meta_definition');
-    }
-
-    /**
-     * @return Query\Builder Helper method to get metaValue table
-     */
-    public function metaValueTable(): Query\Builder
-    {
-        return $this->db('meta_value');
-    }
-
-    /**
-     * @return Query\Builder Helper method to get metaValue table
-     */
-    public function placementTable(): Query\Builder
-    {
-        return $this->db('placement');
     }
 
     /**
@@ -89,7 +44,7 @@ class InitMigration extends Migration
      */
     public function up()
     {
-        Schema::create($this->tables->get('model'), function (Blueprint $table) {
+        Schema::create($this->db_entries->get('model')->getTable(), function (Blueprint $table) {
             $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->softDeletes();
@@ -109,30 +64,29 @@ class InitMigration extends Migration
         });
 
         // @todo: This will be on a config file. global and on a per project basis
-        Schema::create($this->tables->get('meta_definition'), function (Blueprint $table) {
+        Schema::create($this->db_entries->get('meta_definition')->getTable(), function (Blueprint $table) {
             $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->softDeletes();
             $table->string('title');
-            $table->string('name')->index(); // for multi values, this will be `json`
+            $table->string('name')->index();
             $table->string('type'); // for multi values, this will be `json`
             $table->string('description')->nullable();
-            $table->string('model_type'); // for multi values, this will be `json`
+            $table->string('model_type');
             $table->unique(['name', 'model_type']);
         });
 
         // @todo: All meta will be store on this table, see if we can store in different tables
-        // change all code to get from this table
-        Schema::create($this->tables->get('meta_value'), function (Blueprint $table) {
+        Schema::create($this->db_entries->get('meta_value')->getTable(), function (Blueprint $table) {
             $table->bigIncrements('id')->unique();
             $table->timestamps();
-            $table->text('value');
+            $table->text('value')->nullable();
             $table->unsignedBigInteger('model_id', false, true)->index();
             $table->unsignedBigInteger('meta_definition_id', false, true)->index();
             $table->unique(['model_id', 'meta_definition_id']);
         });
 
-        Schema::create($this->tables->get('placement'), function (Blueprint $table) {
+        Schema::create($this->db_entries->get('placement')->getTable(), function (Blueprint $table) {
             $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->unsignedBigInteger('model_id', false, true);
@@ -148,10 +102,10 @@ class InitMigration extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists($this->tables->get('meta_value'));
-        Schema::dropIfExists($this->tables->get('meta_definition'));
-        Schema::dropIfExists($this->tables->get('placement'));
-        Schema::dropIfExists($this->tables->get('model'));
+        Schema::dropIfExists($this->db_entries->get('meta_value')->getTable());
+        Schema::dropIfExists($this->db_entries->get('meta_definition')->getTable());
+        Schema::dropIfExists($this->db_entries->get('placement')->getTable());
+        Schema::dropIfExists($this->db_entries->get('model')->getTable());
     }
 
 //    create table objects(id integer, title varchar(100), objecttype varchar(100));

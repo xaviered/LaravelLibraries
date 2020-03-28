@@ -31,7 +31,7 @@ class MetaValue extends DataEntry
      */
     public function getRawValue(): string
     {
-        return $this->value;
+        return $this->getAttribute('value');
     }
 
     /**
@@ -39,7 +39,7 @@ class MetaValue extends DataEntry
      */
     public function setRawValue(string $value): void
     {
-        $this->value = $value;
+        $this->setAttribute('value', $value);
     }
 
     /**

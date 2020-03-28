@@ -3,6 +3,7 @@
 namespace ixavier\LaravelLibraries\Data\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasMeta;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasPlacements;
 use ixavier\LaravelLibraries\Http\Resources\BaseResource;
@@ -56,7 +57,7 @@ class Model extends DataEntry
     ];
 
     /** @var array Attributes that belong straight to the base model */
-    protected $defaultAttributes = [
+    protected $default_attributes = [
         'id',
         'title',
         'type',
@@ -78,29 +79,47 @@ class Model extends DataEntry
      *
      * @param array $values All values. If any value is not in $this->defaultAttributes
      *  they will be saved as meta values.
-     * @param int|null $parentId Parent ID to use
+     * @param int|null $parent_id Parent ID to use
      *  If null, will use $this as parent
      *  If zero, will not attach a parent to this model (is a root model)
-     * @param bool $ignoreNonExistingMeta If true, will not throw exception when a meta is not defined, will just ignore.
+     * @param bool $ignore_non_existing_meta If true, will not throw exception when a meta is not defined, will just ignore.
+     * @param Collection $meta_definitions A collection of MetaDefinition objects
+     * @param bool $override_existing_meta_definition Override existing meta definition with the ones provided
      * @return Model New created model
      * @throws \Exception If cannot save
      */
-    public function create(array $values, ?int $parentId = null, bool $ignoreNonExistingMeta = true): Model
+    public function create(
+        array $values,
+        ?int $parent_id = null,
+        bool $ignore_non_existing_meta = true,
+        ?Collection $meta_definitions = null,
+        bool $override_existing_meta_definition = false
+    ): Model
     {
         /** @var Model $parent */
         $parent = null;
-        if (is_null($parentId)) {
-            $parentId = $this->id;
-        } else if ($parentId > 0) {
-            $parent = Model::query()->findOrFail($parentId);
+        if (is_null($parent_id)) {
+            $parent_id = $this->id;
+        } else if ($parent_id > 0) {
+            $parent = Model::query()->findOrFail($parent_id);
         }
 
         $model = new Model;
-        $model->setAttributes($values, $ignoreNonExistingMeta);
+        $model->setAttributes($values, true, false);
         if ($model->save()) {
+            // define meta definitions
+            if ($meta_definitions && $meta_definitions->count()) {
+                $model->setMetaDefinitions($meta_definitions);
+            }
+            $attr_diff = array_diff_key($values, $model->getAttributes());
+            $model->setMetaValues($attr_diff, $ignore_non_existing_meta);
+            if (!$model->save()) {
+                throw new \Exception("Could not save model");
+            }
+
             $model->placement()->create([
                 'model_id' => $model->id,
-                'parent_id' => $parentId,
+                'parent_id' => $parent_id,
             ]);
 
             if ($parent) {
@@ -124,42 +143,6 @@ class Model extends DataEntry
     public function isSaved()
     {
         return !empty($this->id) && !empty($this->type);
-    }
-
-    /**
-     * Sets attributes, respecting mutator methods
-     * @param array $values All values. If any value is not in $this->defaultAttributes
-     *  they will be saved as meta values. Meta values need to be defined before being set.
-     *  {@see setMetaDefinition} to add a meta definition.
-     * @param bool $ignoreNonExistingMeta If true, will not throw exception when a meta is not defined, will just ignore.
-     * @return void
-     * @throws \Exception Validation exception
-     */
-    public function setAttributes(array $values, bool $ignoreNonExistingMeta = true): void
-    {
-        foreach ($this->defaultAttributes as $defaultAttribute) {
-            if (isset($values[$defaultAttribute])) {
-                $this->setAttribute($defaultAttribute, $values[$defaultAttribute]);
-                unset($values[$defaultAttribute]);
-            }
-        }
-        /** @var \Exception $error */
-        $error = null;
-        // everything else goes into meta
-        foreach ($values as $key => $value) {
-            try {
-                $this->setMetaValue($key, $value);
-            } catch (\InvalidArgumentException $e) {
-                if (!$ignoreNonExistingMeta) {
-                    $error = new \InvalidArgumentException($e->getMessage(), $e->getCode(), $error);
-                }
-            } catch (\TypeError $e) {
-                $error = new \TypeError($e->getMessage(), $e->getCode(), $error);
-            }
-        }
-        if ($error) {
-            throw $error;
-        }
     }
 
     /**

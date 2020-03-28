@@ -13,12 +13,43 @@ use ixavier\LaravelLibraries\Data\Models\MetaValue;
  */
 trait HasMeta
 {
-    /** @var Collection Of meta definitions as [$metaName => MetaDefinition] */
-    protected $metaDefinitionObjects;
+    /** @var Collection Of meta definitions as [$meta_name => MetaDefinition] */
+    protected $meta_definition_objects;
 
-    /** @var Collection Of meta values as [$metaName => MetaValue] */
-    protected $metaValueObjects;
+    /** @var Collection Of meta values as [$meta_name => MetaValue] */
+    protected $meta_value_objects;
 
+    /**
+     * Includes meta values as well
+     * @return array
+     */
+    public function getAllAttributes()
+    {
+        return array_merge($this->getMetaValues(), parent::getAttributes());
+    }
+
+    /**
+     * Sets attributes, respecting mutator methods
+     * @param array $values All values. If any value is not in $this->defaultAttributes
+     *  they will be saved as meta values. Meta values need to be defined before being set.
+     *  {@see setMetaDefinition} to add a meta definition.
+     * @param bool $ignore_non_existing_meta If true, will not throw exception when a meta is not defined, will just ignore.
+     * @param bool $set_meta_values_too If true, will also set meta values
+     * @return void
+     * @throws \Exception Validation exception when setting meta values
+     */
+    public function setAttributes(array $values, bool $ignore_non_existing_meta = true, bool $set_meta_values_too = true): void
+    {
+        foreach ($this->default_attributes as $defaultAttribute) {
+            if (isset($values[$defaultAttribute])) {
+                $this->setAttribute($defaultAttribute, $values[$defaultAttribute]);
+                unset($values[$defaultAttribute]);
+            }
+        }
+        if ($set_meta_values_too && count($values)) {
+            $this->setMetaValues($values, $ignore_non_existing_meta);
+        }
+    }
 
     /**
      * @throws \LogicException When model is not saved and doesn't have type attribute set
@@ -41,61 +72,72 @@ trait HasMeta
     }
 
     /**
-     * Collection of all meta definitions as [$metaName => MetaDefinition]
+     * Collection of all meta definitions as [$meta_name => MetaDefinition]
      *
      * @param bool $force If true, will reload data
      * @return Collection
      */
     public function getMetaDefinitionObjects(bool $force = false): Collection
     {
-        if (!isset($this->metaDefinitionObjects) || $force) {
-            $this->metaDefinitionObjects = $this->metaDefinitions()->get()->keyBy('name');
+        if (!isset($this->meta_definition_objects) || $force) {
+            $this->meta_definition_objects = $this->metaDefinitions()->get()->keyBy('name');
         }
-        return $this->metaDefinitionObjects;
+        return $this->meta_definition_objects;
     }
 
     /**
      * Gets a MetaDefinition object for the given meta name
      *
-     * @param string $metaName Meta name to load
+     * @param string $meta_name Meta name to load
      * @return MetaDefinition
      */
-    public function getMetaDefinition(string $metaName): ?MetaDefinition
+    public function getMetaDefinition(string $meta_name): ?MetaDefinition
     {
-        return $this->getMetaDefinitionObjects()->get($metaName);
+        return $this->getMetaDefinitionObjects()->get($meta_name);
+    }
+
+    /**
+     * Creates in bulk
+     * @param Collection $meta_definitions A collection of MetaDefinition objects
+     * @param bool $override_existing_meta_definition Override existing meta definition with the ones provided
+     */
+    public function setMetaDefinitions(Collection $meta_definitions, bool $override_existing_meta_definition = false)
+    {
+        $new_entries = (new MetaDefinition())->bulkCreate($meta_definitions, $this->type, $override_existing_meta_definition);
+        $this->meta_definition_objects = $this->meta_definition_objects->merge($new_entries)->keyBy('name');
     }
 
     /**
      * Creates/updates a MetaDefinition object for the given meta name
      *
-     * @param MetaDefinition $metaDefinition Value as MetaDefinition
+     * @param MetaDefinition $meta_definition Value as MetaDefinition
      * @return void
      */
-    public function setMetaDefinition(MetaDefinition $metaDefinition): void
+    public function setMetaDefinition(MetaDefinition $meta_definition): void
     {
         $this->validateIsSaved();
 
-        $metaName = $metaDefinition->name;
+        $meta_name = $meta_definition->name;
 
-        $attributes = $metaDefinition->attributesToArray();
+        $attributes = $meta_definition->attributesToArray();
         unset($attributes['id']);
 
         /** @var MetaDefinition $md */
-        $md = $this->getMetaDefinition($metaName) ?? new MetaDefinition();
+        $md = $this->getMetaDefinition($meta_name) ?? new MetaDefinition();
         $md->setRawAttributes($attributes);
 
         $md->model_type = $this->type;
         $md->save();
-        $this->getMetaDefinitionObjects()->put($metaName, $md);
+        $this->getMetaDefinitionObjects()->put($meta_name, $md);
     }
 
     /**
-     * @param string $metaName Meta name to check
+     * @param string $meta_name Meta name to check
      * @return bool
      */
-    public function hasMetaDefinition(string $metaName): bool
+    public function hasMetaDefinition(string $meta_name): bool
     {
-        return $this->getMetaDefinition($metaName) ? true : false;
+        return $this->getMetaDefinition($meta_name) ? true : false;
     }
 
     /**
@@ -120,7 +162,7 @@ trait HasMeta
     }
 
     /**
-     * Collection of only defined meta values as [$metaName => MetaDefinition]
+     * Collection of only defined meta values as [$meta_name => MetaDefinition]
      * Use $this->getMetaValueObjects()->get('name')->entry to get actual MetaValue object
      *
      * @param bool $force If true, will reload data
@@ -128,63 +170,100 @@ trait HasMeta
      */
     public function getMetaValueObjects(bool $force = false): Collection
     {
-        if (!isset($this->metaValueObjects) || $force) {
-            $this->metaValueObjects = $this->metaValues()->get()->keyBy('name');
+        if (!isset($this->meta_value_objects) || $force) {
+            $this->meta_value_objects = $this->metaValues()->get()->keyBy('name');
         }
-        return $this->metaValueObjects;
+        return $this->meta_value_objects;
+    }
+
+    /**
+     * All meta values
+     * @return array
+     */
+    public function getMetaValues(): array
+    {
+        $mvo = $this->getMetaValueObjects();
+        return array_combine($mvo->keys()->toArray(), $mvo->pluck('value')->toArray());
     }
 
     /**
      * Gets a MetaValue object for the given meta name
      *
-     * @param string $metaName Meta name to load
+     * @param string $meta_name Meta name to load
      * @return MetaValue|null
      */
-    public function getMetaValue(string $metaName): ?MetaValue
+    public function getMetaValue(string $meta_name): ?MetaValue
     {
-        return $this->getMetaValueObjects()->get($metaName)->entry;
+        return $this->getMetaValueObjects()->has($meta_name) ? $this->getMetaValueObjects()->get($meta_name)->entry : null;
+    }
+
+    /**
+     * Object must be saved in db before we can set meta values
+     * @param array $values Meta values
+     * @param bool $ignore_non_existing_meta
+     * @throws \Exception Validation exception
+     */
+    public function setMetaValues(array $values, bool $ignore_non_existing_meta = true)
+    {
+        /** @var \Exception $error */
+        $error = null;
+        // everything else goes into meta
+        foreach ($values as $key => $value) {
+            try {
+                $this->setMetaValue($key, $value);
+            } catch (\InvalidArgumentException $e) {
+                if (!$ignore_non_existing_meta) {
+                    $error = new \InvalidArgumentException($e->getMessage(), $e->getCode(), $error);
+                }
+            } catch (\TypeError $e) {
+                $error = new \TypeError($e->getMessage(), $e->getCode(), $error);
+            }
+        }
+        if ($error) {
+            throw $error;
+        }
     }
 
     /**
      * Creates/updates a meta value
      *
-     * @param string $metaName Meta name
+     * @param string $meta_name Meta name
      * @param MetaValue|mixed $value Value as MetaValue or a scalar
      * @return void
      * @throws \TypeError If $value is not a MetaValue or a scalar
      * @throws \InvalidArgumentException Meta definition not found.
      */
-    public function setMetaValue(string $metaName, $value): void
+    public function setMetaValue(string $meta_name, $value): void
     {
         $this->validateIsSaved();
 
-        $md = $this->getMetaDefinition($metaName);
+        $md = $this->getMetaDefinition($meta_name);
         if ($md) {
-            if (!($value instanceof MetaValue) || !is_scalar($value)) {
+            if (!($value instanceof MetaValue || is_scalar($value))) {
                 throw new \TypeError("Value needs to be a MetaValue or a scalar");
             }
 
-            $mv = $this->getMetaValue($metaName) ?? new MetaValue();
+            $mv = $this->getMetaValue($meta_name) ?? new MetaValue();
             $mv->value = $value;
             $mv->model_id = $this->id;
             $mv->meta_definition_id = $md->id;
             $mv->save();
 
+            $this->meta_value_objects->put($meta_name, $mv);
             // @todo: May need to do attach or update here
-            $this->metaValues()->attach($mv->id);
-            $this->metaValueObjects->put($metaName, $mv);
+//            $this->metaValues()->attach($mv,  $mv->getAttributes());
         } else {
-            throw new \InvalidArgumentException("There is no meta definition for $metaName");
+            throw new \InvalidArgumentException("There is no meta definition for $meta_name");
         }
     }
 
     /**
-     * @param string $metaName Meta name to check
+     * @param string $meta_name Meta name to check
      * @return bool
      */
-    public function hasMetaValue(string $metaName): bool
+    public function hasMetaValue(string $meta_name): bool
     {
-        return $this->getMetaValueObjects()->get($metaName) ? true : false;
+        return $this->getMetaValueObjects()->get($meta_name) ? true : false;
     }
 
     /**
