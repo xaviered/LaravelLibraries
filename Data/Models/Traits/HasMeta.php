@@ -239,8 +239,12 @@ trait HasMeta
 
         $md = $this->getMetaDefinition($meta_name);
         if ($md) {
-            if (!($value instanceof MetaValue || is_scalar($value))) {
-                throw new \TypeError("Value needs to be a MetaValue or a scalar");
+            if (!(
+                $value instanceof MetaValue ||
+                is_scalar($value) ||
+                (is_array($value) && $md->type === 'json')
+            )) {
+                throw new \TypeError("Incorrect data type for value {$this->type}.{$meta_name}");
             }
 
             $mv = $this->getMetaValue($meta_name) ?? new MetaValue();

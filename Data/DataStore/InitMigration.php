@@ -51,13 +51,13 @@ class InitMigration extends Migration
             $table->string('title');
             $table->string('type')->index();
             $table->string('href')->nullable();
-            $table->unsignedBigInteger('alias_id', false, true)
+            $table->unsignedBigInteger('alias_id')
                 ->nullable()
                 ->index();
-            $table->unsignedBigInteger('updated_by', false, true)
+            $table->unsignedBigInteger('updated_by')
                 ->nullable()
                 ->index();
-            $table->unsignedBigInteger('created_by', false, true)
+            $table->unsignedBigInteger('created_by')
                 ->nullable()
                 ->index();
             $table->text('content')->nullable();
@@ -81,16 +81,17 @@ class InitMigration extends Migration
             $table->bigIncrements('id')->unique();
             $table->timestamps();
             $table->text('value')->nullable();
-            $table->unsignedBigInteger('model_id', false, true)->index();
-            $table->unsignedBigInteger('meta_definition_id', false, true)->index();
+            $table->unsignedBigInteger('value_id')->nullable()->index();
+            $table->unsignedBigInteger('model_id')->index();
+            $table->unsignedBigInteger('meta_definition_id')->index();
             $table->unique(['model_id', 'meta_definition_id']);
         });
 
         Schema::create($this->db_entries->get('placement')->getTable(), function (Blueprint $table) {
             $table->bigIncrements('id')->unique();
             $table->timestamps();
-            $table->unsignedBigInteger('model_id', false, true);
-            $table->unsignedBigInteger('parent_id', false, true)->nullable();
+            $table->unsignedBigInteger('model_id');
+            $table->unsignedBigInteger('parent_id')->nullable();
             $table->json('children')->nullable();
         });
     }
