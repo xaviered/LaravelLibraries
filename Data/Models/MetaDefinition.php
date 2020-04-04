@@ -72,6 +72,15 @@ class MetaDefinition extends DataEntry
         return $all_entries;
     }
 
+    /**
+     * Unique name for this meta definition. i.e. model_type.meta_definition_name
+     * @return string
+     */
+    public function getUniqueName()
+    {
+        return $this->model_type . '.' . $this->name;
+    }
+
 //    /**
 //     * All related models to
 //     * @return Relations\BelongsToMany

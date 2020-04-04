@@ -2,6 +2,7 @@
 
 namespace ixavier\LaravelLibraries\Data\Models\Traits;
 
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations;
 use ixavier\LaravelLibraries\Data\Models\MetaDefinition;
@@ -157,7 +158,10 @@ trait HasMeta
             ->as('entry')
             ->using(MetaValue::class)
             ->withPivot([
-                'value'
+                'value',
+                'value_id',
+                'model_id',
+                'meta_definition_id',
             ]);
     }
 
@@ -183,7 +187,11 @@ trait HasMeta
     public function getMetaValues(): array
     {
         $mvo = $this->getMetaValueObjects();
-        return array_combine($mvo->keys()->toArray(), $mvo->pluck('value')->toArray());
+        $values = [];
+        foreach ($mvo as $name => $meta_value) {
+            $values[$name] = $meta_value->getValue();
+        }
+        return $values;
     }
 
     /**
@@ -194,7 +202,7 @@ trait HasMeta
      */
     public function getMetaValue(string $meta_name): ?MetaValue
     {
-        return $this->getMetaValueObjects()->has($meta_name) ? $this->getMetaValueObjects()->get($meta_name)->entry : null;
+        return $this->getMetaValueObjects()->has($meta_name) ? $this->getMetaValueObjects()->get($meta_name) : null;
     }
 
     /**
@@ -241,16 +249,21 @@ trait HasMeta
         if ($md) {
             if (!(
                 $value instanceof MetaValue ||
+                $value instanceof Carbon ||
                 is_scalar($value) ||
                 (is_array($value) && $md->type === 'json')
             )) {
-                throw new \TypeError("Incorrect data type for value {$this->type}.{$meta_name}");
+                $vtype = gettype($value);
+                if ($vtype === 'object') {
+                    $vtype = 'object(' . get_class($value) . ')';
+                }
+                throw new \TypeError("Incorrect data type of {$vtype} for value {$md->getUniqueName()}");
             }
 
             $mv = $this->getMetaValue($meta_name) ?? new MetaValue();
-            $mv->value = $value;
             $mv->model_id = $this->id;
             $mv->meta_definition_id = $md->id;
+            $mv->value = $value;
             $mv->save();
 
             $this->meta_value_objects->put($meta_name, $mv);
@@ -295,7 +308,8 @@ trait HasMeta
     public function __get($name)
     {
         if ($this->hasMetaDefinition($name)) {
-            return $this->getMetaValue($name);
+            $meta_value = $this->getMetaValue($name);
+            return $meta_value ? $meta_value->getValue() : null;
         }
 
         return parent::__get($name);

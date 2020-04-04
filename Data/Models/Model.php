@@ -112,7 +112,9 @@ class Model extends DataEntry
                 $model->setMetaDefinitions($meta_definitions);
             }
             $attr_diff = array_diff_key($values, $model->getAttributes());
-            $model->setMetaValues($attr_diff, $ignore_non_existing_meta);
+            if(count($attr_diff)) {
+                $model->setMetaValues($attr_diff, $ignore_non_existing_meta);
+            }
             if (!$model->save()) {
                 throw new \Exception("Could not save model");
             }
