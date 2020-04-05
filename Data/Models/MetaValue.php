@@ -4,6 +4,7 @@ namespace ixavier\LaravelLibraries\Data\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations;
+use ixavier\LaravelLibraries\Data\Meta\Mutators\BaseMutator;
 
 /**
  * Class MetaValue holds a value for a given model meta
@@ -21,9 +22,6 @@ class MetaValue extends DataEntry
     /** @var string Table name */
     protected $table = 'meta_values';
 
-    /** @var int Encoding options for JSON for this instance */
-    protected $encoding_options = self::DEFAULT_ENCODING_OPTIONS;
-
     /** @var array The attributes that are mass assignable. */
     protected $fillable = [
         'value',
@@ -32,9 +30,8 @@ class MetaValue extends DataEntry
         'meta_definition_id',
     ];
 
-    public function __construct(array $attributes = [], ?int $encoding_options = self::DEFAULT_ENCODING_OPTIONS)
+    public function __construct(array $attributes = [])
     {
-        $this->encoding_options = $encoding_options;
         parent::__construct($attributes);
     }
 
@@ -48,17 +45,31 @@ class MetaValue extends DataEntry
     }
 
     /**
+     * @param mixed $value Actual value
+     * @param Model|int|null $value_id If its a reference, this is the ID
+     * @return BaseMutator
+     */
+    protected function getMetaMutator($value, $value_id = null): BaseMutator
+    {
+        $type = $this->metaDefinition->type;
+        // @todo: May want to look for project specific mutators
+        $class = '\\ixavier\\LaravelLibraries\\Data\\Meta\\Mutators\\' . ucfirst($type) . 'Mutator';
+
+        if (class_exists($class)) {
+            $is_reference = $class::isValueReference();
+            /** @var BaseMutator $mutator */
+            return new $class($is_reference ? $value_id : $value);
+        }
+        return new BaseMutator($value);
+    }
+
+    /**
      * @return string|array|mixed|Model
      */
     public function getValue()
     {
-        $type = $this->metaDefinition->type;
-        $method = 'get' . ucfirst($type) . 'Value';
-        if (method_exists($this, $method)) {
-            return call_user_func([$this, $method], ...func_get_args());
-        }
-
-        return $this->getAttribute('value');
+        $mutator = $this->getMetaMutator($this->getAttribute('value'), $this->getAttribute('value_id'));
+        return $mutator->deserialize();
     }
 
     /**
@@ -66,64 +77,9 @@ class MetaValue extends DataEntry
      */
     public function setValue($value): void
     {
-        $type = $this->metaDefinition->type;
-        $method = 'set' . ucfirst($type) . 'Value';
-        if (method_exists($this, $method)) {
-            call_user_func([$this, $method], ...func_get_args());
-        }
-    }
-
-    /**
-     * @return Carbon|null Carbon object if its a date string
-     */
-    public function getDateValue(): ?Carbon
-    {
-        return Carbon::createFromTimeString($this->getAttribute('value'));
-    }
-
-    /**
-     * @return Model|null Model object if its a model ID
-     */
-    public function getModelValue(): ?Model
-    {
-        $v = $this->getAttribute('value_id');
-        print_r(['looking for', $v]);
-        return Model::query()->where('id', '=', $v)->first();
-    }
-
-    /**
-     * @return array|null Array if its a JSON string
-     */
-    public function getJsonValue(): ?array
-    {
-        return json_decode($this->getAttribute('value'), true);
-    }
-
-    /**
-     * @param Carbon $date Carbon date
-     */
-    public function setDateValue(Carbon $date): void
-    {
-        $this->setAttribute('value', $date->toDateTimeString());
-    }
-
-    /**
-     * @param int $model_id ID of model
-     */
-    public function setModelValue(int $model_id): void
-    {
-        if ($model_id <= 0) {
-            throw new \InvalidArgumentException("Model ID has to be a positive integer for " . $this->metaDefinition->getUniqueName());
-        }
-        $this->setAttribute('value_id', $model_id);
-    }
-
-    /**
-     * @param mixed $value Value will be converted to JSON string on DB
-     */
-    public function setJsonValue($value): void
-    {
-        $this->setAttribute('value', json_encode($value, $this->encodingOptions));
+        $mutator = $this->getMetaMutator($value, $value);
+        $attribute = get_class($mutator)::isValueReference() ? 'value_id': 'value';
+        $this->setAttribute($attribute, $mutator->serialize());
     }
 
     /**

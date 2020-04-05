@@ -112,7 +112,7 @@ class Model extends DataEntry
                 $model->setMetaDefinitions($meta_definitions);
             }
             $attr_diff = array_diff_key($values, $model->getAttributes());
-            if(count($attr_diff)) {
+            if (count($attr_diff)) {
                 $model->setMetaValues($attr_diff, $ignore_non_existing_meta);
             }
             if (!$model->save()) {
@@ -145,6 +145,17 @@ class Model extends DataEntry
     public function isSaved()
     {
         return !empty($this->id) && !empty($this->type);
+    }
+
+    /**
+     * Quick view of object
+     * @return string
+     */
+    public function toString()
+    {
+        $attributes = $this->getAllAttributes();
+        return 'object(' . $this->type . ' Model) - ' . count($attributes) . ' attributes:' . PHP_EOL
+            . print_r($attributes, 1);
     }
 
     /**

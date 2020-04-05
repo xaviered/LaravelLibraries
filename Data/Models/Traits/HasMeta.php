@@ -26,6 +26,7 @@ trait HasMeta
      */
     public function getAllAttributes()
     {
+        // @todo: include placement info: parent, children, etc
         return array_merge($this->getMetaValues(), parent::getAttributes());
     }
 
