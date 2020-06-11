@@ -144,26 +144,33 @@ trait HasMeta
 
     /**
      * All meta values for this model
-     * @return Relations\BelongsToMany
+     * @return Relations\HasMany
      */
-    protected function metaValues(): Relations\BelongsToMany
+    protected function metaValues()
     {
-        /** @var Model $this Model */
-        return $this->belongsToMany(
-            MetaDefinition::class,
-            (new MetaValue())->getTable(),
+        // @todo: need custom query for relationship needs
+        return $this->hasMany(
+            MetaValue::class,
             'model_id',
-            'meta_definition_id'
-        )
-            // @todo: May want to add in who columns
-            ->as('entry')
-            ->using(MetaValue::class)
-            ->withPivot([
-                'value',
-                'value_id',
-                'model_id',
-                'meta_definition_id',
-            ]);
+            'id'
+        );
+
+//        /** @var Model $this Model */
+//        return $this->belongsToMany(
+//            MetaValue::class,
+//            (new MetaValue())->getTable(),
+//            'model_id',
+//            'meta_definition_id'
+//        )
+////            ->as('entry')
+//            ->using(MetaValue::class)
+//            // @todo: May want to add in who columns
+//            ->withPivot([
+//                'value',
+//                'value_id',
+//                'model_id',
+//                'meta_definition_id',
+//            ]);
     }
 
     /**
@@ -176,7 +183,15 @@ trait HasMeta
     public function getMetaValueObjects(bool $force = false): Collection
     {
         if (!isset($this->meta_value_objects) || $force) {
-            $this->meta_value_objects = $this->metaValues()->get()->keyBy('name');
+            $this->meta_value_objects = new Collection();
+            $mvo = $this->metaValues()->get();
+            $mdo = $this->getMetaDefinitionObjects(true)->keyBy('id');
+            /** @var MetaValue $mv */
+            foreach ($mvo as $mv) {
+                $mv->metaDefinition = $mdo->get($mv->meta_definition_id);
+                $this->meta_value_objects->put($mv->metaDefinition->name, $mv);
+            }
+
         }
         return $this->meta_value_objects;
     }
@@ -185,12 +200,16 @@ trait HasMeta
      * All meta values
      * @return array
      */
-    public function getMetaValues(): array
+    public function getMetaValues(bool $include_nulls = true): array
     {
-        $mvo = $this->getMetaValueObjects();
+        $mdo = $this->getMetaDefinitionObjects();
         $values = [];
-        foreach ($mvo as $name => $meta_value) {
-            $values[$name] = $meta_value->getValue();
+        foreach ($mdo as $name => $meta_definition) {
+            if ($this->hasMetaValue($name)) {
+                $values[$name] = $this->getMetaValueObjects()->get($name)->getValue();
+            } else if ($include_nulls) {
+                $values[$name] = null;
+            }
         }
         return $values;
     }

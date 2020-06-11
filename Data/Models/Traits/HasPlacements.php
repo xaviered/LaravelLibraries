@@ -72,10 +72,10 @@ trait HasPlacements
     /**
      * @return Model|null Parent model, null if model is a root
      */
-    public function parent(): ?Model
+    public function parent()
     {
         /** @var Placement $placement */
-        return $this->placement->parent();
+        return $this->placement->parent()->first();
     }
 
     /**
@@ -132,13 +132,16 @@ trait HasPlacements
         $modelId = $model->id;
         $mtable = $this->getTable();
         $ptable = (new Placement())->getTable();
-        return Model::query()
+        $q = Model::query()
             ->select(["{$mtable}.*", "{$ptable}.children as children"])
             ->join($ptable, function (Query\JoinClause $join) use ($ptable, $mtable, $modelId) {
-                $join->whereJsonContains("{$ptable}.children", "CAST({$mtable}.id as JSON)")
+                // @todo: the value is sent as a string, not as a MySQL function
+                $join->whereJsonContains("{$ptable}.children", 'CAST({$mtable}.id as JSON)')
                     ->where("{$ptable}.model_id", '=', $modelId);
             })
-            ->orderBy("children")
-            ->get();
+            ->orderBy("children");
+
+        $q->dd();
+        return $q->get();
     }
 }

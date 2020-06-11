@@ -14,6 +14,6 @@ class ModelLoader
      */
     public function getModelType(string $type): ?Model
     {
-        return new Model([], $type);
+        return new Model();
     }
 }

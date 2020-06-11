@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasMeta;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasPlacements;
-use ixavier\LaravelLibraries\Http\Resources\BaseResource;
-use ixavier\LaravelLibraries\Http\Resources\BaseResourceCollection;
+use ixavier\LaravelLibraries\Http\Resources\ModelResource;
+use ixavier\LaravelLibraries\Http\Resources\ModelResourceCollection;
 
 /**
  * Class Model
@@ -159,34 +159,10 @@ class Model extends DataEntry
     }
 
     /**
-     * Resource to load model
-     * @return BaseResource|null
+     * @return array Data for API response
      */
-    public function getResource(): BaseResource
+    public function toArray()
     {
-        $this->touches;
-        $class_name = static::class;
-        $dir_class_name = dirname($class_name);
-        $base_class_name = basename($class_name);
-        $class = $dir_class_name . '\\Http\\Resource\\' . $base_class_name;
-        if (class_exists($class)) {
-            return new $class($this);
-        }
-
-        return new BaseResource($this);
-    }
-
-    // @todo: Move this to the collection loader
-    public function getResourceCollection(): ?BaseResourceCollection
-    {
-        $class_name = static::class;
-        $dir_class_name = dirname($class_name);
-        $base_class_name = basename($class_name);
-        $class = $dir_class_name . '\\Http\\Resource\\' . $base_class_name . 'Collection';
-        if (class_exists($class)) {
-            return new $class([$this]);
-        }
-
-        return null;
+        return $this->getAllAttributes();
     }
 }

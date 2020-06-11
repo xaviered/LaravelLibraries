@@ -48,11 +48,8 @@ class Placement extends DataEntry
     /**
      * @return Relations\BelongsTo|Model|null Null if placement has no parent
      */
-    public function parent(): ?Model
+    public function parent()
     {
-        if (!empty($this->parent_id)) {
-            return $this->belongsTo(Model::class, 'parent_id');
-        }
-        return null;
+        return $this->belongsTo(Model::class, 'parent_id');
     }
 }
