@@ -135,13 +135,11 @@ trait HasPlacements
         $q = Model::query()
             ->select(["{$mtable}.*", "{$ptable}.children as children"])
             ->join($ptable, function (Query\JoinClause $join) use ($ptable, $mtable, $modelId) {
-                // @todo: the value is sent as a string, not as a MySQL function
-                $join->whereJsonContains("{$ptable}.children", 'CAST({$mtable}.id as JSON)')
-                    ->where("{$ptable}.model_id", '=', $modelId);
+                $join->where("{$ptable}.model_id", '=', $modelId)
+                    ->whereRaw("JSON_CONTAINS(`{$ptable}`.`children`, CAST(`{$mtable}`.`id` as JSON))");
             })
             ->orderBy("children");
 
-        $q->dd();
         return $q->get();
     }
 }
