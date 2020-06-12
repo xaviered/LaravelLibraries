@@ -73,6 +73,7 @@ class InitMigration extends Migration
             $table->string('type'); // for multi values, this will be `json`
             $table->string('description')->nullable();
             $table->string('model_type');
+            $table->boolean('required')->nullable()->default(null);
             $table->unique(['name', 'model_type']);
         });
 

@@ -2,7 +2,8 @@
 
 namespace ixavier\LaravelLibraries\Data\Models;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent;
+use Illuminate\Database\Query;
 use Illuminate\Support\Collection;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasMeta;
 use ixavier\LaravelLibraries\Data\Models\Traits\HasPlacements;
@@ -29,7 +30,7 @@ class Model extends DataEntry
 {
     use HasMeta;
     use HasPlacements;
-    use SoftDeletes;
+    use Eloquent\SoftDeletes;
 
     // @todo: Add a check to allow to be null only if user is root
     /** @var string Column name for created timestamp */
@@ -48,27 +49,33 @@ class Model extends DataEntry
     /** @var int Fetch only children under the original model if current model is an alias */
     public const CHILDREN_FROM_ORIGINAL_MODEL = 3;
 
+    /** @var array Basic attributes for a model */
+    public const ALL_MODEL_ATTRIBUTES = [
+        'id' => 'id',
+        'title' => 'title',
+        'type' => 'type',
+        'href' => 'href',
+        'alias_id' => 'alias_id',
+        'content' => 'content',
+        'created_at' => 'created_at',
+        'created_by' => 'created_by',
+        'updated_at' => 'updated_at',
+        'updated_by' => 'updated_by',
+        'deleted_at' => 'deleted_at',
+    ];
+
+    /** @var array Required attributes to create a new model */
+    public const REQUIRED_MODEL_ATTRIBUTES = [
+        'title' => 'title',
+        'type' => 'type',
+    ];
+
     /** @var string Table name */
     protected $table = 'models';
 
     /** @var array The attributes that are mass assignable. */
     protected $fillable = [
         'title',
-    ];
-
-    /** @var array Attributes that belong straight to the base model */
-    protected $default_attributes = [
-        'id',
-        'title',
-        'type',
-        'href',
-        'alias_id',
-        'content',
-        'created_at',
-        'created_by',
-        'updated_at',
-        'updated_by',
-        'deleted_at',
     ];
 
     /** @var array The relationships that should be touched on save. */
@@ -104,6 +111,13 @@ class Model extends DataEntry
             $parent = Model::query()->findOrFail($parent_id);
         }
 
+        $this->validateAttributes($values);
+
+        $exists = static::exists($values);
+        if ($exists) {
+            throw new \LogicException("Model already exists");
+        }
+
         $model = new Model;
         $model->setAttributes($values, true, false);
         if ($model->save()) {
@@ -137,6 +151,147 @@ class Model extends DataEntry
         }
 
         return $model;
+    }
+
+    /**
+     * Validates all required attributes
+     * @param array $attributes
+     */
+    public function validateAttributes(array $attributes)
+    {
+        if (empty($attributes['type']) || !is_string($attributes['type'])) {
+            throw new \InvalidArgumentException("Must provide a string value for model type");
+        }
+
+        $required = static::REQUIRED_MODEL_ATTRIBUTES;
+        // no need to add more requirements for alias
+        // @todo: check if alias id exists
+        if (!isset($attributes['alias_id']) || $attributes['alias_id'] <= 0) {
+            $meta_required = MetaDefinition::getRequiredMeta($attributes['type'])->pluck('name')->toArray();
+            $meta_required = array_combine($meta_required, $meta_required);
+            $required = array_merge(
+                array_combine($meta_required, $meta_required),
+                $required
+            );
+        }
+
+        $diff = array_diff_key($required, $attributes);
+        if ($diff) {
+            throw new \InvalidArgumentException("Must provide a value for these model attributes: " . join(', ', $diff));
+        }
+    }
+
+    /**
+     * Hits the database to see if the query exists based on the unique properties
+     * @param array $values Query to search
+     * @param string $model_type Use this model type if 'type' is not defined in the $values array
+     * @param string $title Use this model title if 'title' is not defined in the $values array
+     * @return bool True if it exists, false otherwise.
+     */
+    public static function exists(array $values, string $model_type = '', string $title = ''): bool
+    {
+        if (empty($model_type)) {
+            if (empty($values['type']) || !is_string($values['type'])) {
+                throw new \InvalidArgumentException("Must provide a string value for model type");
+            }
+            $model_type = $values['type'];
+        }
+
+        if (empty($title)) {
+            if (empty($values['title']) || !is_string($values['title'])) {
+                throw new \InvalidArgumentException("Must provide a string value for model title");
+            }
+            $title = $values['title'];
+        }
+
+        $query = [];
+        $unique_metas = MetaDefinition::getRequiredMeta($model_type)->pluck('name')->toArray();
+        if (count($unique_metas)) {
+            foreach ($unique_metas as $meta) {
+                if (isset($values[$meta])) {
+                    $query[$meta] = $values[$meta];
+                }
+            }
+
+            if ($query) {
+                $query['type'] = $model_type;
+                $query['title'] = $title;
+            }
+        }
+
+        /** @var Eloquent\Builder $q */
+        list($q, $model_query, $meta_query) = static::prepareSearchQuery($query);
+        $count = $q->count();
+
+        $expected_count = 1;
+
+        if ($meta_query) {
+            $expected_count += count($meta_query);
+        }
+
+        return $count === $expected_count;
+    }
+
+    public static function search(array $query): Eloquent\Collection
+    {
+        /** @var Eloquent\Builder $q */
+        list($q, $model_query, $meta_query) = static::prepareSearchQuery($query);
+        return $q->get();
+    }
+
+    /**
+     * Prepares search query based on query params
+     * @param array $query Query params
+     * @return array [Eloquent\Builder, array, array]
+     */
+    public static function prepareSearchQuery(array $query): array
+    {
+        $m_table = static::getTableName();
+        list($model_query, $meta_query) = static::split_attributes($query, $m_table);
+
+        // first query to search only on model
+        $q = static::query()
+            ->select("{$m_table}.*")
+            ->where($model_query);
+
+        if (count($meta_query)) {
+            $md_table = MetaDefinition::getTableName();
+            $mv_table = MetaValue::getTableName();
+
+            $metaq = static::query()
+                ->select("{$m_table}.*")
+                ->where($model_query)
+                ->join($md_table, function (Query\JoinClause $join) use ($m_table, $md_table, $meta_query) {
+                    $join->whereRaw("{$m_table}.type = {$md_table}.model_type")
+                        ->whereIn("{$md_table}.name", array_keys($meta_query));
+                })
+                ->join($mv_table, function (Query\JoinClause $join) use ($m_table, $md_table, $mv_table, $meta_query) {
+                    $join
+                        ->whereRaw("{$m_table}.id = {$mv_table}.model_id")
+                        ->whereRaw("{$md_table}.id = {$mv_table}.meta_definition_id")
+                        ->whereIn("{$mv_table}.value", array_values($meta_query));
+                });
+
+            $q = $q->union($metaq, true);
+        }
+
+        return [$q, $model_query, $meta_query];
+    }
+
+    protected static function split_attributes(array $attributes, string $table_name = ''): array
+    {
+        $table_name = $table_name ?: static::getTableName();
+        $model_query = [];
+        $meta_query = [];
+        foreach ($attributes as $name => $value) {
+            if (isset(static::ALL_MODEL_ATTRIBUTES[$name])) {
+                $model_query["{$table_name}.{$name}"] = $value;
+            } else {
+                $meta_query[$name] = $value;
+            }
+        }
+
+        return [$model_query, $meta_query];
     }
 
     /**

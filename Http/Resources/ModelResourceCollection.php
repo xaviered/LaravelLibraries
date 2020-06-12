@@ -24,8 +24,9 @@ class ModelResourceCollection extends ResourceCollection
      */
     public function with($request)
     {
+        $first = $this->collection->first();
         return [
-            'parent' => $this->collection->first()->parent(),
+            'parent' => !empty($first) ? $first->parent(): null,
         ];
     }
 }

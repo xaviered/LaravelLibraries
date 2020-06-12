@@ -42,7 +42,7 @@ trait HasMeta
      */
     public function setAttributes(array $values, bool $ignore_non_existing_meta = true, bool $set_meta_values_too = true): void
     {
-        foreach ($this->default_attributes as $defaultAttribute) {
+        foreach (static::ALL_MODEL_ATTRIBUTES as $defaultAttribute) {
             if (isset($values[$defaultAttribute])) {
                 $this->setAttribute($defaultAttribute, $values[$defaultAttribute]);
                 unset($values[$defaultAttribute]);

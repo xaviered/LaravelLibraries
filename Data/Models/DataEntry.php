@@ -9,5 +9,12 @@ use Illuminate\Database\Eloquent\Model;
  */
 abstract class DataEntry extends Model
 {
-
+    /**
+     * Helper function to get table name statically
+     * @return string
+     */
+    public static function getTableName()
+    {
+        return (new static)->getTable();
+    }
 }

@@ -31,6 +31,7 @@ class MetaDefinition extends DataEntry
         'type',
         'description',
         'model_type',
+        'required',
     ];
 
     /**
@@ -79,6 +80,19 @@ class MetaDefinition extends DataEntry
     public function getUniqueName()
     {
         return $this->model_type . '.' . $this->name;
+    }
+
+    /**
+     * Gets unique meta definitions for the given model type
+     * @param string $model_type Model type
+     * @return Collection
+     */
+    public static function getRequiredMeta(string $model_type): Collection
+    {
+        return static::query()
+            ->where('model_type', $model_type)
+            ->where('required', true)
+            ->get();
     }
 
 //    /**
