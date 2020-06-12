@@ -49,7 +49,7 @@ trait HasPlacements
      */
     public function original(): ?Model
     {
-        return $this->belongsTo(Model::class, 'alias_id');
+        return $this->belongsTo(Model::class, 'alias_id')->first() ?? null;
     }
 
     /**

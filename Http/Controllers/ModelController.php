@@ -35,7 +35,7 @@ abstract class ModelController extends BaseController
      */
     public function list(string $type): ModelResourceCollection
     {
-        $models = Model::search(['type' => $type]);
+        $models = Model::search(['type' => $type, 'alias_id' => null]);
         return new ModelResourceCollection($models);
     }
 
@@ -61,7 +61,6 @@ abstract class ModelController extends BaseController
     {
         $params = Request::capture()->all();
         $model = new Model();
-        $model->create($params);
-        dd($params);
+        return new ModelResource($model->create($params));
     }
 }

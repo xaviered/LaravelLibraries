@@ -163,6 +163,17 @@ class Model extends DataEntry
             throw new \InvalidArgumentException("Must provide a string value for model type");
         }
 
+        // set current user
+        if (empty($attributes['id'])) {
+            if (empty($attributes['created_by']) || $attributes['created_by'] <= 0) {
+                $attributes['created_by'] = request()->user()->id ?? 0;
+            }
+        } else {
+            if (empty($attributes['updated_by']) || $attributes['updated_by'] <= 0) {
+                $attributes['updated_by'] = request()->user()->id ?? 0;
+            }
+        }
+
         $required = static::REQUIRED_MODEL_ATTRIBUTES;
         // no need to add more requirements for alias
         // @todo: check if alias id exists
@@ -232,11 +243,40 @@ class Model extends DataEntry
         return $count === $expected_count;
     }
 
+    /**
+     * Basic model search, including meta info
+     * @param array $query Array of key=>value pairs to search for
+     * @return Eloquent\Collection
+     */
     public static function search(array $query): Eloquent\Collection
     {
         /** @var Eloquent\Builder $q */
         list($q, $model_query, $meta_query) = static::prepareSearchQuery($query);
-        return $q->get();
+        $results = $q->get();
+        foreach ($results as &$r) {
+            $r->finishLoading();
+        }
+
+        return $results;
+    }
+
+    /**
+     * Loads alias/original attribute information
+     */
+    protected function finishLoading()
+    {
+        $attributes = $this->getAllAttributes();
+        if (isset($this->alias_id)) {
+            $original = $this->original();
+            if ($original) {
+                $original_attributes = $original->getAllAttributes();
+                foreach ($original_attributes as $name => $value) {
+                    if (is_null($attributes[$name])) {
+                        $this->setAttribute($name, $value);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -254,25 +294,39 @@ class Model extends DataEntry
             ->select("{$m_table}.*")
             ->where($model_query);
 
+        // add in meta names and values
         if (count($meta_query)) {
             $md_table = MetaDefinition::getTableName();
             $mv_table = MetaValue::getTableName();
 
-            $metaq = static::query()
-                ->select("{$m_table}.*")
-                ->where($model_query)
-                ->join($md_table, function (Query\JoinClause $join) use ($m_table, $md_table, $meta_query) {
-                    $join->whereRaw("{$m_table}.type = {$md_table}.model_type")
-                        ->whereIn("{$md_table}.name", array_keys($meta_query));
-                })
-                ->join($mv_table, function (Query\JoinClause $join) use ($m_table, $md_table, $mv_table, $meta_query) {
-                    $join
-                        ->whereRaw("{$m_table}.id = {$mv_table}.model_id")
-                        ->whereRaw("{$md_table}.id = {$mv_table}.meta_definition_id")
-                        ->whereIn("{$mv_table}.value", array_values($meta_query));
-                });
+            /** @var Eloquent\Builder $all_metaq */
+            $all_metaq = null;
+            foreach ($meta_query as $name => $value) {
+                $metaq = static::query()
+                    ->select("{$m_table}.*")
+                    ->join($md_table, function (Query\JoinClause $join) use ($m_table, $md_table, $name) {
+                        $join->whereRaw("{$m_table}.type = {$md_table}.model_type")
+                            ->where("{$md_table}.name", $name);
+                    })
+                    ->join($mv_table, function (Query\JoinClause $join) use ($m_table, $md_table, $mv_table, $value) {
+                        $join->whereRaw("{$m_table}.id = {$mv_table}.model_id")
+                            ->whereRaw("{$md_table}.id = {$mv_table}.meta_definition_id")
+                            ->where("{$mv_table}.value", $value);
+                    });
 
-            $q = $q->union($metaq, true);
+                if (empty($all_metaq)) {
+                    $all_metaq = $metaq;
+                } else {
+                    $all_metaq = $all_metaq->union($metaq, true);
+                }
+            }
+
+            $q->unionAll(
+                static::query()
+                    ->select("{$m_table}.*")
+                    ->where($model_query)
+                    ->joinSub($all_metaq, 'meta_models', "{$m_table}.id", 'meta_models.id')
+            );
         }
 
         return [$q, $model_query, $meta_query];
