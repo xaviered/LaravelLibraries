@@ -51,7 +51,7 @@ class MetaValue extends DataEntry
      */
     protected function getMetaMutator($value, $value_id = null): BaseMutator
     {
-        $type = $this->metaDefinition->type;
+        $type = $this->metaDefinition()->first()->type;
         // @todo: May want to look for project specific mutators
         $class = '\\ixavier\\LaravelLibraries\\Data\\Meta\\Mutators\\' . ucfirst($type) . 'Mutator';
 

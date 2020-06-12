@@ -84,7 +84,7 @@ class Model extends DataEntry
     /**
      * Helper function to create a model and dependencies
      *
-     * @param array $values All values. If any value is not in $this->defaultAttributes
+     * @param array $attributes All values. If any value is not in $this->defaultAttributes
      *  they will be saved as meta values.
      * @param int|null $parent_id Parent ID to use
      *  If null, will use $this as parent
@@ -96,7 +96,7 @@ class Model extends DataEntry
      * @throws \Exception If cannot save
      */
     public function create(
-        array $values,
+        array $attributes,
         ?int $parent_id = null,
         bool $ignore_non_existing_meta = true,
         ?Collection $meta_definitions = null,
@@ -111,21 +111,21 @@ class Model extends DataEntry
             $parent = Model::query()->findOrFail($parent_id);
         }
 
-        $this->validateAttributes($values);
+        $this->validateAttributes($attributes);
 
-        $exists = static::exists($values);
+        $exists = static::exists($attributes);
         if ($exists) {
             throw new \LogicException("Model already exists");
         }
 
         $model = new Model;
-        $model->setAttributes($values, true, false);
+        $model->setAttributes($attributes, true, false);
         if ($model->save()) {
             // define meta definitions
             if ($meta_definitions && $meta_definitions->count()) {
                 $model->setMetaDefinitions($meta_definitions);
             }
-            $attr_diff = array_diff_key($values, $model->getAttributes());
+            $attr_diff = array_diff_key($attributes, $model->getAttributes());
             if (count($attr_diff)) {
                 $model->setMetaValues($attr_diff, $ignore_non_existing_meta);
             }
@@ -153,17 +153,66 @@ class Model extends DataEntry
         return $model;
     }
 
+    // @todo: update the 'updated` timestamps
+    /**
+     * Performs update, but throws detailed error if it happens
+     * @param array $attributes
+     * @throws \Exception Detailed error about failure
+     */
+    public function updateOrFail(array $attributes)
+    {
+        $this->validateAttributes($attributes);
+
+        if (!$this->exists) {
+            throw new \LogicException("Model does not exists");
+        }
+
+        // this is not the place tor these changes
+        unset($attributes['id']);
+        unset($attributes['parent_id']);
+        unset($attributes['alias_id']);
+
+        if (!parent::update($attributes)) {
+            throw new \Exception("Could not update");
+        }
+
+        $attr_diff = array_diff_key($attributes, $this->getAttributes());
+        if (count($attr_diff)) {
+            $this->setMetaValues($attr_diff);
+        }
+        if (!$this->save()) {
+            throw new \Exception("Could not save model");
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function update(array $attributes = [], array $options = [])
+    {
+        try {
+            $this->updateOrFail($attributes);
+        } catch (\Exception $e) {
+            // @todo: May want to log these errors
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Validates all required attributes
+     * @param string $action Which controller action is being performed
      * @param array $attributes
      */
-    public function validateAttributes(array $attributes)
+    public function validateAttributes(array $attributes, string $action = 'add')
     {
         if (empty($attributes['type']) || !is_string($attributes['type'])) {
             throw new \InvalidArgumentException("Must provide a string value for model type");
         }
 
-        // set current user
+        $required = static::REQUIRED_MODEL_ATTRIBUTES;
+
         if (empty($attributes['id'])) {
             if (empty($attributes['created_by']) || $attributes['created_by'] <= 0) {
                 $attributes['created_by'] = request()->user()->id ?? 0;
@@ -174,7 +223,19 @@ class Model extends DataEntry
             }
         }
 
-        $required = static::REQUIRED_MODEL_ATTRIBUTES;
+        // set current user
+        switch ($action) {
+            case 'add':
+                // @todo: Add this once we have users in place
+//                $required['created_by'] = 'created_by';
+                break;
+            case 'update':
+                $required['id'] = 'id';
+                // @todo: Add this once we have users in place
+//                $required['updated_by'] = 'created_by';
+                break;
+        }
+
         // no need to add more requirements for alias
         // @todo: check if alias id exists
         if (!isset($attributes['alias_id']) || $attributes['alias_id'] <= 0) {
@@ -186,7 +247,12 @@ class Model extends DataEntry
             );
         }
 
-        $diff = array_diff_key($required, $attributes);
+        $diff = [];
+        foreach ($required as $key) {
+            if (empty($attributes[$key])) {
+                $diff[$key] = $key;
+            }
+        }
         if ($diff) {
             throw new \InvalidArgumentException("Must provide a value for these model attributes: " . join(', ', $diff));
         }
@@ -258,6 +324,33 @@ class Model extends DataEntry
         }
 
         return $results;
+    }
+
+    /**
+     * Same as searchOne(), but fails if could not find anything
+     * @param array $query Array of key=>value pairs to search for
+     * @return static|null Null if could not find it
+     */
+    public static function searchOneOrFail(array $query): self
+    {
+        list($q, $model_query, $meta_query) = Model::prepareSearchQuery($query);
+        $model = $q->firstOrFail();
+        $model->finishLoading();
+        return $model;
+    }
+
+    /**
+     * Same as search(), but returns first entry
+     * @param array $query Array of key=>value pairs to search for
+     * @return static|null Null if could not find it
+     */
+    public static function searchOne(array $query): ?self
+    {
+        try {
+            return static::searchOneOrFail($query);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**

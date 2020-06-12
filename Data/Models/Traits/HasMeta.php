@@ -188,8 +188,8 @@ trait HasMeta
             $mdo = $this->getMetaDefinitionObjects(true)->keyBy('id');
             /** @var MetaValue $mv */
             foreach ($mvo as $mv) {
-                $mv->metaDefinition = $mdo->get($mv->meta_definition_id);
-                $this->meta_value_objects->put($mv->metaDefinition->name, $mv);
+                $md = $mdo->get($mv->meta_definition_id);
+                $this->meta_value_objects->put($md->name, $mv);
             }
 
         }

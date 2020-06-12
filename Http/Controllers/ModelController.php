@@ -46,9 +46,7 @@ abstract class ModelController extends BaseController
      */
     public function view(string $type, int $id): ModelResource
     {
-        /** @var Eloquent\Builder $q */
-        list($q, $model_query, $meta_query) = static::prepareSearchQuery(['id' => $id, 'type' => $type]);
-        return new ModelResource($q->firstOrFail());
+        return new ModelResource(Model::searchOneOrFail(['id' => $id, 'type' => $type]));
     }
 
     public function search(): ModelResourceCollection
@@ -62,5 +60,15 @@ abstract class ModelController extends BaseController
         $params = Request::capture()->all();
         $model = new Model();
         return new ModelResource($model->create($params));
+    }
+
+    public function update(string $type, int $id): ModelResource
+    {
+        $params = Request::capture()->all();
+        $model = Model::searchOneOrFail(['id' => $id, 'type' => $type]);
+        $params['id'] = $id;
+        $params['type'] = $params['type'] ?? $type;
+        $model->updateOrFail($params);
+        return new ModelResource($model);
     }
 }
